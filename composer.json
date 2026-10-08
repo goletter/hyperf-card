@@ -1,0 +1,50 @@
+{
+    "name": "goletter/hyperf-card",
+    "description": "Hyperf 多平台发卡 SDK（Airwallex / Slash / Lampay / Photonpay / Wasabi），含 Factory、Bundle 与可选统一适配层",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "goletter",
+            "email": "goletter@outlook.com"
+        }
+    ],
+    "keywords": [
+        "php",
+        "hyperf",
+        "card",
+        "airwallex",
+        "slash",
+        "lampay",
+        "photonpay",
+        "wasabi",
+        "hyperf-card"
+    ],
+    "replace": {
+        "goletter/card": "self.version"
+    },
+    "require": {
+        "php": ">=8.1",
+        "ext-json": "*",
+        "ext-openssl": "*",
+        "guzzlehttp/guzzle": "^7.0"
+    },
+    "suggest": {
+        "hyperf/framework": "Required to use ConfigProvider in Hyperf applications."
+    },
+    "autoload": {
+        "psr-4": {
+            "Goletter\\Card\\": "src/"
+        }
+    },
+    "extra": {
+        "hyperf": {
+            "config": "Goletter\\Card\\ConfigProvider"
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "config": {
+        "sort-packages": true
+    }
+}
