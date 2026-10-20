@@ -12,6 +12,7 @@ return [
         2 => 'lampay',
         3 => 'photonpay',
         4 => 'wasabi',
+        5 => 'youcardx',
     ],
 
     'airwallex' => [
@@ -71,5 +72,17 @@ return [
         'private_key' => env('WASABI_PRIVATE_KEY', ''),
         'wsb_public_key' => env('WASABI_WSB_PUBLIC_KEY', ''),
         'timeout' => 60,
+    ],
+
+    'youcardx' => [
+        // 联调 https://test.youcardx.com ，生产 https://gateway.youcardx.com
+        'base_url' => env('YOUCARDX_BASE_URL', 'https://test.youcardx.com'),
+        'client_id' => env('YOUCARDX_CLIENT_ID', ''),
+        'secret' => env('YOUCARDX_SECRET', ''),
+        'timeout' => 60,
+        'verify_response' => true,
+        // 'access_token' => '',
+        // 'token_type' => 'Bearer',
+        // 'expires_in' => 0,
     ],
 ];

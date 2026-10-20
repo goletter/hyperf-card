@@ -9,6 +9,7 @@ use Goletter\Card\Platforms\Lampay\Lampay;
 use Goletter\Card\Platforms\Photonpay\Photonpay;
 use Goletter\Card\Platforms\Slash\Slash;
 use Goletter\Card\Platforms\Wasabi\Wasabi;
+use Goletter\Card\Platforms\Youcardx\Youcardx;
 use InvalidArgumentException;
 
 /**
@@ -29,6 +30,7 @@ class CardFactory
     public const LAMPAY = 'lampay';
     public const PHOTONPAY = 'photonpay';
     public const WASABI = 'wasabi';
+    public const YOUCARDX = 'youcardx';
 
     /** @var array<int|string, string> */
     protected static array $defaultAliases = [
@@ -37,6 +39,7 @@ class CardFactory
         2 => self::LAMPAY,
         3 => self::PHOTONPAY,
         4 => self::WASABI,
+        5 => self::YOUCARDX,
     ];
 
     /**
@@ -144,6 +147,14 @@ class CardFactory
     /**
      * @param array<string, mixed> $config
      */
+    public static function youcardx(array $config = []): CardPlatformBundle
+    {
+        return self::make(self::YOUCARDX, $config);
+    }
+
+    /**
+     * @param array<string, mixed> $config
+     */
     public function create(string|int $platform, array $config = []): CardPlatformBundle
     {
         $name = $this->resolvePlatform($platform);
@@ -207,6 +218,7 @@ class CardFactory
         self::$creators[self::LAMPAY] = static fn (array $config): CardPlatformBundle => self::buildLampay($config);
         self::$creators[self::PHOTONPAY] = static fn (array $config): CardPlatformBundle => self::buildPhotonpay($config);
         self::$creators[self::WASABI] = static fn (array $config): CardPlatformBundle => self::buildWasabi($config);
+        self::$creators[self::YOUCARDX] = static fn (array $config): CardPlatformBundle => self::buildYoucardx($config);
     }
 
     /**
@@ -257,5 +269,15 @@ class CardFactory
         $platform = new Wasabi($config);
 
         return new CardPlatformBundle($platform, $platform->getClient(), self::WASABI);
+    }
+
+    /**
+     * @param array<string, mixed> $config
+     */
+    protected static function buildYoucardx(array $config): CardPlatformBundle
+    {
+        $platform = new Youcardx($config);
+
+        return new CardPlatformBundle($platform, $platform->getClient(), self::YOUCARDX);
     }
 }

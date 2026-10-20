@@ -1,6 +1,6 @@
 # Goletter Card SDK
 
-多平台卡片 API SDK，支持 Airwallex、Slash、Lampay、Photonpay、Wasabi。
+多平台卡片 API SDK，支持 Airwallex、Slash、Lampay、Photonpay、Wasabi、Youcardx。
 
 ## 安装
 
@@ -21,7 +21,7 @@ composer require goletter/hyperf-card
 | 层级 | 入口 | 命名空间 | 行为 |
 |------|------|----------|------|
 | **SDK 层** | `$bundle->card()` / `api()` | `Platforms\{Vendor}\Api\CardApi` | 官方路径 + 原始 JSON；失败抛 `*ApiException` |
-| **适配层** | `$bundle->adapter()` | `Platforms\{Vendor}\Adapter\CardAdapter` | `{code,msg,data}` + 字段/状态映射（Lampay 无适配层，`adapter()` 为 `null`） |
+| **适配层** | `$bundle->adapter()` | `Platforms\{Vendor}\Adapter\CardAdapter` | `{code,msg,data}` + 字段/状态映射（Lampay、Youcardx 无适配层，`adapter()` 为 `null`） |
 
 推荐：`CardFactory` → `CardPlatformBundle` → 按需 `card()` 或 `adapter()`。
 
@@ -197,6 +197,7 @@ $bundle = CardFactory::slash(); // 使用配置文件中的 slash 段
 | `CardFactory::lampay($config)` / `make(2, …)` | Lampay |
 | `CardFactory::photonpay($config)` / `make(3, …)` | Photonpay |
 | `CardFactory::wasabi($config)` / `make(4, …)` | Wasabi |
+| `CardFactory::youcardx($config)` / `make(5, …)` | Youcardx |
 
 Airwallex Token 持久化示例：
 
@@ -845,6 +846,64 @@ $detail = $bundle->adapter()->cardInfo(['card_id' => 'xxx']);
 $raw = $bundle->card()->listCards(['pageNum' => 1, 'pageSize' => 20]);
 ```
 
+## Youcardx API
+
+YouCard VCC OpenAPI。联调 `https://test.youcardx.com`，生产 `https://gateway.youcardx.com`。没有统一 Result 适配层，用 SDK 层。Token 用 `client_id` + `secret` 做 Basic 认证自动获取，请求带 HMAC-SHA256 签名。
+
+```php
+use Goletter\Card\CardFactory;
+use Goletter\Card\Platforms\Youcardx\Exceptions\YoucardxApiException;
+use Goletter\Card\Platforms\Youcardx\Exceptions\YoucardxTokenExpiredException;
+
+$bundle = CardFactory::youcardx([
+    'base_url' => 'https://test.youcardx.com',
+    'client_id' => 'merchant_client_id',
+    'secret' => 'merchant_secret',
+]);
+
+$cards = $bundle->card()->list(['budget_id' => 'budget_xxx', 'start_page' => 1, 'row' => 20]);
+$detail = $bundle->card()->detail('virtual_id');
+$bundle->card()->recharge('virtual_id', '10.00', 'order-001');
+
+$bundle->budget()->list(['start_page' => 1, 'row' => 20]);
+$bundle->cardholder()->list(['start_page' => 1, 'row' => 20]);
+$bundle->account()->balanceList();
+
+$event = $bundle->webhook()->parse(getallheaders(), file_get_contents('php://input'));
+```
+
+| 入口 | 说明 |
+|------|------|
+| `card()` | 开卡、查卡、充值退值、限额、冻结 / 解冻 / 销卡、交易 |
+| `budget()` | 预算账户申请、充值转出、结算 |
+| `cardholder()` | 持卡人 |
+| `file()` | 证件图片上传（jpg/png，不超过 3M） |
+| `account()` | 主账户余额与结算 |
+| `webhook()` | 验签并解析回调 |
+
+配置项：
+
+| 参数 | 必填 | 默认 | 说明 |
+|------|------|------|------|
+| `base_url` | 否 | `https://test.youcardx.com` | 也可用 `baseUrl` |
+| `client_id` | 是 | — | 商户 client id，也可用 `clientId` |
+| `secret` | 是 | — | 签名、Basic 认证、Webhook 验签 |
+| `timeout` | 否 | `60` | 秒 |
+| `verify_response` | 否 | `true` | 校验响应 `timestamp` / `sign` |
+| `access_token` / `expires_in` | 否 | — | 已有 token 时可跳过首次换票 |
+
+成功码是字符串 `0000`。业务 `code` 不是 `0000` 时仍返回响应体，由调用方判断；HTTP 失败抛 `YoucardxApiException`，401 抛 `YoucardxTokenExpiredException`。
+
+```php
+try {
+    $cards = $bundle->card()->list();
+} catch (YoucardxTokenExpiredException $e) {
+    // Token 失效，Client 会先刷新并重试一次
+} catch (YoucardxApiException $e) {
+    $error = $e->getResponse();
+}
+```
+
 ## 注意事项
 
 ### Airwallex
@@ -894,6 +953,13 @@ $raw = $bundle->card()->listCards(['pageNum' => 1, 'pageSize' => 20]);
 1. **认证**：`X-WSB-API-KEY` + RSA 请求签名；响应用平台公钥验签，敏感数据用商户私钥解密。
 
 2. **环境配置**：沙箱默认 `https://sandbox-api-merchant.wasabicard.com`，生产请换成正式域名。
+
+### Youcardx
+
+1. **认证**：`GET /api/v2/vcc/token`，`Authorization: Basic base64(client_id:secret)`。再次换票会使旧 token 失效，可用 `token_loader` / `token_saver` 在进程间共用。
+2. **签名**：请求头 `timestamp` + `sign`（HMAC-SHA256，密钥为 `secret`）。Webhook 签名串是 `{MessageType}.{Timestamp}.{rawBody}`。
+3. **环境**：联调 `https://test.youcardx.com`，生产 `https://gateway.youcardx.com`。
+4. **异步**：开卡、充值、冻结等结果通过 Webhook 回调。商户需在 10 秒内返回 HTTP 200。
 
 ### 通用
 
