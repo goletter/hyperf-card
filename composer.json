@@ -31,7 +31,8 @@
         "guzzlehttp/guzzle": "^7.0"
     },
     "suggest": {
-        "hyperf/framework": "Required to use ConfigProvider in Hyperf applications."
+        "hyperf/framework": "Required to use ConfigProvider in Hyperf applications.",
+        "goletter/hyperf-utils": "Optional; enables call_logs channel when log_request is on or a request fails."
     },
     "autoload": {
         "psr-4": {

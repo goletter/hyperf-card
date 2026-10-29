@@ -10,6 +10,7 @@ use Goletter\Card\Platforms\Photonpay\Photonpay;
 use Goletter\Card\Platforms\Slash\Slash;
 use Goletter\Card\Platforms\Wasabi\Wasabi;
 use Goletter\Card\Platforms\Youcardx\Youcardx;
+use Goletter\Card\Support\CallLog;
 use InvalidArgumentException;
 
 /**
@@ -78,6 +79,16 @@ class CardFactory
     public static function getShared(): self
     {
         return self::$shared ??= new self();
+    }
+
+    /**
+     * 注册全平台 HTTP 调用日志回调（含 duration_ms）。
+     *
+     * @param null|callable(array $log): void $handler
+     */
+    public static function setCallLogHandler(?callable $handler): void
+    {
+        CallLog::setHandler($handler);
     }
 
     /**

@@ -6,6 +6,7 @@ namespace Goletter\Card\Platforms\Wasabi;
 
 use Goletter\Card\Contract\PlatformClientInterface;
 use Goletter\Card\Platforms\Wasabi\Exceptions\WasabiApiException;
+use Goletter\Card\Support\LogsHttpRequests;
 use Goletter\Card\Support\OpenSslPem;
 use Goletter\Card\Support\ParsesJsonResponses;
 use GuzzleHttp\Client as GuzzleClient;
@@ -15,6 +16,7 @@ use Psr\Http\Message\ResponseInterface;
 
 class Client implements PlatformClientInterface
 {
+    use LogsHttpRequests;
     use ParsesJsonResponses;
 
     protected const HEADER_SIGNATURE = 'X-WSB-SIGNATURE';
@@ -30,6 +32,7 @@ class Client implements PlatformClientInterface
             $config = new Config($config);
         }
         $this->config = $config;
+        $this->logRequest = $config->logRequest;
         $this->httpClient = new GuzzleClient([
             'base_uri' => $this->config->baseUrl . '/',
             'timeout' => $this->config->timeout,
@@ -55,6 +58,7 @@ class Client implements PlatformClientInterface
     {
         $data = is_array($options['json'] ?? null) ? $options['json'] : [];
         $body = $this->encodeBody($data);
+        $startedAt = microtime(true);
 
         try {
             $response = $this->httpClient->request($method, ltrim($path, '/'), [
@@ -62,13 +66,21 @@ class Client implements PlatformClientInterface
                 'headers' => array_merge($options['headers'] ?? [], $this->buildHeaders($body)),
             ]);
 
-            return $this->handleResponse($response);
+            $result = $this->handleResponse($response);
+            $this->pushCallLog('wasabi', $method, $path, true, '', $this->elapsedMs($startedAt));
+
+            return $result;
         } catch (WasabiApiException $exception) {
+            $this->pushCallLog('wasabi', $method, $path, false, $exception->getMessage(), $this->elapsedMs($startedAt));
             throw $exception;
         } catch (RequestException $exception) {
-            throw $this->handleException($exception);
+            $error = $this->handleException($exception);
+            $this->pushCallLog('wasabi', $method, $path, false, $error->getMessage(), $this->elapsedMs($startedAt));
+            throw $error;
         } catch (GuzzleException $exception) {
-            throw new WasabiApiException('Wasabi request failed: ' . $exception->getMessage(), 0, [], $exception);
+            $message = 'Wasabi request failed: ' . $exception->getMessage();
+            $this->pushCallLog('wasabi', $method, $path, false, $message, $this->elapsedMs($startedAt));
+            throw new WasabiApiException($message, 0, [], $exception);
         }
     }
 

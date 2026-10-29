@@ -18,6 +18,11 @@ class Config
 
     public int $timeout;
 
+    /**
+     * Whether to log every request duration (call_logs / CallLog handler).
+     */
+    public bool $logRequest;
+
     public int|string $cardAccountId;
 
     /**
@@ -30,6 +35,7 @@ class Config
         $this->privateKey = ConfigSupport::string($config, ['private_key', 'privateKey']);
         $this->wsbPublicKey = ConfigSupport::string($config, ['wsb_public_key', 'wsbPublicKey']);
         $this->timeout = ConfigSupport::int($config, ['timeout'], 60);
+        $this->logRequest = ConfigSupport::bool($config, ['log_request', 'logRequest'], false);
         $this->cardAccountId = ConfigSupport::value($config, ['card_accounts_id', 'cardAccountId', 'card_account_id'], '') ?? '';
     }
 }

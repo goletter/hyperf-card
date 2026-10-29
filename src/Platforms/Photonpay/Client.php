@@ -7,6 +7,7 @@ namespace Goletter\Card\Platforms\Photonpay;
 use Goletter\Card\Contract\PlatformClientInterface;
 use Goletter\Card\Platforms\Photonpay\Exceptions\PhotonpayApiException;
 use Goletter\Card\Platforms\Photonpay\Exceptions\PhotonpayTokenExpiredException;
+use Goletter\Card\Support\LogsHttpRequests;
 use Goletter\Card\Support\OpenSslPem;
 use Goletter\Card\Support\ParsesJsonResponses;
 use GuzzleHttp\Client as GuzzleClient;
@@ -15,6 +16,7 @@ use GuzzleHttp\Exception\RequestException;
 
 class Client implements PlatformClientInterface
 {
+    use LogsHttpRequests;
     use ParsesJsonResponses;
 
     protected Config $config;
@@ -35,6 +37,7 @@ class Client implements PlatformClientInterface
             $config = new Config($config);
         }
         $this->config = $config;
+        $this->logRequest = $config->logRequest;
         $this->httpClient = new GuzzleClient([
             'base_uri' => $this->config->baseUrl . '/',
             'timeout' => $this->config->timeout,
@@ -67,11 +70,12 @@ class Client implements PlatformClientInterface
      */
     public function refreshAccessToken(): string
     {
-        try {
-            $path = $this->config->tokenUrl !== ''
-                ? $this->config->tokenUrl
-                : '/api/v1/auth/token';
+        $path = $this->config->tokenUrl !== ''
+            ? $this->config->tokenUrl
+            : '/api/v1/auth/token';
+        $startedAt = microtime(true);
 
+        try {
             $response = $this->httpClient->post($path, [
                 'json' => [
                     'api_key' => $this->config->apiKey,
@@ -102,13 +106,20 @@ class Client implements PlatformClientInterface
                 $this->tokenExpiresAt = (int) $result['exp'];
             }
 
+            $this->pushCallLog('photonpay', 'POST', $path, true, '', $this->elapsedMs($startedAt));
+
             return $this->accessToken;
         } catch (PhotonpayApiException $e) {
+            $this->pushCallLog('photonpay', 'POST', $path, false, $e->getMessage(), $this->elapsedMs($startedAt));
             throw $e;
         } catch (RequestException $e) {
-            throw $this->handleException($e);
+            $exception = $this->handleException($e);
+            $this->pushCallLog('photonpay', 'POST', $path, false, $exception->getMessage(), $this->elapsedMs($startedAt));
+            throw $exception;
         } catch (GuzzleException $e) {
-            throw new PhotonpayApiException('Failed to refresh access token: ' . $e->getMessage(), 0, [], $e);
+            $message = 'Failed to refresh access token: ' . $e->getMessage();
+            $this->pushCallLog('photonpay', 'POST', $path, false, $message, $this->elapsedMs($startedAt));
+            throw new PhotonpayApiException($message, 0, [], $e);
         }
     }
 
@@ -221,6 +232,8 @@ class Client implements PlatformClientInterface
      */
     public function request(string $method, string $path, array $options = []): array
     {
+        $startedAt = microtime(true);
+
         try {
             $response = $this->httpClient->request($method, ltrim($path, '/'), $options);
             $status = $response->getStatusCode();
@@ -242,12 +255,18 @@ class Client implements PlatformClientInterface
                 );
             }
 
+            $this->pushCallLog('photonpay', $method, $path, true, '', $this->elapsedMs($startedAt));
+
             return $data;
         } catch (PhotonpayApiException $e) {
+            $this->pushCallLog('photonpay', $method, $path, false, $e->getMessage(), $this->elapsedMs($startedAt));
             throw $e;
         } catch (RequestException $e) {
-            throw $this->handleException($e);
+            $exception = $this->handleException($e);
+            $this->pushCallLog('photonpay', $method, $path, false, $exception->getMessage(), $this->elapsedMs($startedAt));
+            throw $exception;
         } catch (GuzzleException $e) {
+            $this->pushCallLog('photonpay', $method, $path, false, $e->getMessage(), $this->elapsedMs($startedAt));
             throw new PhotonpayApiException($e->getMessage(), 0, [], $e);
         }
     }

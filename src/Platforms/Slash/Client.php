@@ -7,6 +7,7 @@ namespace Goletter\Card\Platforms\Slash;
 use Goletter\Card\Contract\PlatformClientInterface;
 use Goletter\Card\Platforms\Slash\Exceptions\SlashApiException;
 use Goletter\Card\Platforms\Slash\Exceptions\SlashTokenExpiredException;
+use Goletter\Card\Support\LogsHttpRequests;
 use Goletter\Card\Support\ParsesJsonResponses;
 use GuzzleHttp\Client as GuzzleClient;
 use GuzzleHttp\Exception\GuzzleException;
@@ -17,6 +18,7 @@ use GuzzleHttp\Exception\RequestException;
  */
 class Client implements PlatformClientInterface
 {
+    use LogsHttpRequests;
     use ParsesJsonResponses;
 
     protected Config $config;
@@ -29,6 +31,7 @@ class Client implements PlatformClientInterface
             $config = new Config($config);
         }
         $this->config = $config;
+        $this->logRequest = $config->logRequest;
         $headers = [
             'Content-Type' => 'application/json',
             'X-API-Key' => $this->config->apiKey,
@@ -134,6 +137,8 @@ class Client implements PlatformClientInterface
             unset($options['absolute_base_uri']);
         }
 
+        $startedAt = microtime(true);
+
         try {
             $response = $this->httpClient->request($method, $uri, $options);
             $status = $response->getStatusCode();
@@ -155,12 +160,18 @@ class Client implements PlatformClientInterface
                 );
             }
 
+            $this->pushCallLog('slash', $method, $path, true, '', $this->elapsedMs($startedAt));
+
             return $data;
         } catch (SlashApiException $e) {
+            $this->pushCallLog('slash', $method, $path, false, $e->getMessage(), $this->elapsedMs($startedAt));
             throw $e;
         } catch (RequestException $e) {
-            throw $this->handleException($e);
+            $exception = $this->handleException($e);
+            $this->pushCallLog('slash', $method, $path, false, $exception->getMessage(), $this->elapsedMs($startedAt));
+            throw $exception;
         } catch (GuzzleException $e) {
+            $this->pushCallLog('slash', $method, $path, false, $e->getMessage(), $this->elapsedMs($startedAt));
             throw new SlashApiException($e->getMessage(), 0, [], $e);
         }
     }

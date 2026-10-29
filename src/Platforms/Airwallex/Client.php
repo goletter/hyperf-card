@@ -8,6 +8,7 @@ use Goletter\Card\Contract\PlatformClientInterface;
 use Goletter\Card\Contract\TokenPersisterInterface;
 use Goletter\Card\Platforms\Airwallex\Exceptions\AirwallexApiException;
 use Goletter\Card\Platforms\Airwallex\Exceptions\AirwallexTokenExpiredException;
+use Goletter\Card\Support\LogsHttpRequests;
 use Goletter\Card\Support\ParsesJsonResponses;
 use GuzzleHttp\Client as GuzzleClient;
 use GuzzleHttp\Exception\GuzzleException;
@@ -15,6 +16,7 @@ use GuzzleHttp\Exception\RequestException;
 
 class Client implements PlatformClientInterface
 {
+    use LogsHttpRequests;
     use ParsesJsonResponses;
 
     protected Config $config;
@@ -33,6 +35,7 @@ class Client implements PlatformClientInterface
             $config = new Config($config);
         }
         $this->config = $config;
+        $this->logRequest = $config->logRequest;
         $this->httpClient = new GuzzleClient([
             'base_uri' => $this->config->baseUrl,
             'timeout' => $this->config->timeout,
@@ -65,8 +68,11 @@ class Client implements PlatformClientInterface
      */
     public function refreshAccessToken(): string
     {
+        $path = '/api/v1/authentication/login';
+        $startedAt = microtime(true);
+
         try {
-            $response = $this->httpClient->post('/api/v1/authentication/login', [
+            $response = $this->httpClient->post($path, [
                 'headers' => [
                     'x-api-key' => $this->config->apiKey,
                     'x-client-id' => $this->config->clientId,
@@ -85,14 +91,20 @@ class Client implements PlatformClientInterface
             $this->tokenExpiresAt = is_string($expiresIn) ? (strtotime($expiresIn) ?: null) : (is_int($expiresIn) ? $expiresIn : null);
 
             $this->persistToken();
+            $this->pushCallLog('airwallex', 'POST', $path, true, '', $this->elapsedMs($startedAt));
 
             return $this->accessToken;
         } catch (AirwallexApiException $e) {
+            $this->pushCallLog('airwallex', 'POST', $path, false, $e->getMessage(), $this->elapsedMs($startedAt));
             throw $e;
         } catch (RequestException $e) {
-            throw $this->handleException($e);
+            $exception = $this->handleException($e);
+            $this->pushCallLog('airwallex', 'POST', $path, false, $exception->getMessage(), $this->elapsedMs($startedAt));
+            throw $exception;
         } catch (GuzzleException $e) {
-            throw new AirwallexApiException('Failed to refresh access token: ' . $e->getMessage(), 0, [], $e);
+            $message = 'Failed to refresh access token: ' . $e->getMessage();
+            $this->pushCallLog('airwallex', 'POST', $path, false, $message, $this->elapsedMs($startedAt));
+            throw new AirwallexApiException($message, 0, [], $e);
         }
     }
 
@@ -152,13 +164,15 @@ class Client implements PlatformClientInterface
      */
     protected function send(string $method, string $path, array $options = [], bool $requireAuth = true): array
     {
-        try {
-            if ($requireAuth) {
-                $options['headers'] = array_merge($options['headers'] ?? [], [
-                    'Authorization' => 'Bearer ' . $this->getAccessToken(),
-                ]);
-            }
+        if ($requireAuth) {
+            $options['headers'] = array_merge($options['headers'] ?? [], [
+                'Authorization' => 'Bearer ' . $this->getAccessToken(),
+            ]);
+        }
 
+        $startedAt = microtime(true);
+
+        try {
             $response = $this->httpClient->request($method, $path, $options);
             $status = $response->getStatusCode();
             $data = $this->parseResponse($response);
@@ -179,12 +193,18 @@ class Client implements PlatformClientInterface
                 );
             }
 
+            $this->pushCallLog('airwallex', $method, $path, true, '', $this->elapsedMs($startedAt));
+
             return $data;
         } catch (AirwallexApiException $e) {
+            $this->pushCallLog('airwallex', $method, $path, false, $e->getMessage(), $this->elapsedMs($startedAt));
             throw $e;
         } catch (RequestException $e) {
-            throw $this->handleException($e);
+            $exception = $this->handleException($e);
+            $this->pushCallLog('airwallex', $method, $path, false, $exception->getMessage(), $this->elapsedMs($startedAt));
+            throw $exception;
         } catch (GuzzleException $e) {
+            $this->pushCallLog('airwallex', $method, $path, false, $e->getMessage(), $this->elapsedMs($startedAt));
             throw new AirwallexApiException($e->getMessage(), 0, [], $e);
         }
     }

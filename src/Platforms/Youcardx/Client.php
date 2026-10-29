@@ -7,6 +7,7 @@ namespace Goletter\Card\Platforms\Youcardx;
 use Goletter\Card\Contract\PlatformClientInterface;
 use Goletter\Card\Platforms\Youcardx\Exceptions\YoucardxApiException;
 use Goletter\Card\Platforms\Youcardx\Exceptions\YoucardxTokenExpiredException;
+use Goletter\Card\Support\LogsHttpRequests;
 use GuzzleHttp\Client as GuzzleClient;
 use GuzzleHttp\Exception\GuzzleException;
 use GuzzleHttp\Exception\RequestException;
@@ -14,6 +15,8 @@ use Psr\Http\Message\ResponseInterface;
 
 class Client implements PlatformClientInterface
 {
+    use LogsHttpRequests;
+
     public const SUCCESS_CODE = '0000';
 
     protected const TOKEN_PATH = '/api/v2/vcc/token';
@@ -34,6 +37,7 @@ class Client implements PlatformClientInterface
             $config = new Config($config);
         }
         $this->config = $config;
+        $this->logRequest = $config->logRequest;
         $this->httpClient = new GuzzleClient([
             'base_uri' => $this->config->baseUrl . '/',
             'timeout' => $this->config->timeout,
@@ -96,42 +100,54 @@ class Client implements PlatformClientInterface
      */
     public function refreshAccessToken(): string
     {
+        $path = self::TOKEN_PATH;
+        $startedAt = microtime(true);
+
         try {
-            $response = $this->httpClient->request('GET', ltrim(self::TOKEN_PATH, '/'), [
+            $response = $this->httpClient->request('GET', ltrim($path, '/'), [
                 'headers' => [
                     'Authorization' => 'Basic ' . base64_encode($this->config->clientId . ':' . $this->config->secret),
                 ],
             ]);
+
+            $result = $this->parseResponse($response);
+            $data = $result['data'] ?? [];
+
+            if (! self::isSuccess($result) || empty($data['access_token'])) {
+                throw new YoucardxApiException(
+                    'Failed to refresh YouCard access token: ' . ($result['message'] ?? 'token not found'),
+                    0,
+                    $result
+                );
+            }
+
+            $this->accessToken = (string) $data['access_token'];
+            $this->tokenType = (string) ($data['token_type'] ?? 'Bearer');
+            $this->tokenExpiresAt = time() + (int) ($data['expires_in'] ?? 0);
+
+            if (is_callable($this->config->tokenSaver)) {
+                call_user_func($this->config->tokenSaver, [
+                    'access_token' => $this->accessToken,
+                    'token_type' => $this->tokenType,
+                    'expires_at' => $this->tokenExpiresAt,
+                ]);
+            }
+
+            $this->pushCallLog('youcardx', 'GET', $path, true, '', $this->elapsedMs($startedAt));
+
+            return $this->accessToken;
+        } catch (YoucardxApiException $exception) {
+            $this->pushCallLog('youcardx', 'GET', $path, false, $exception->getMessage(), $this->elapsedMs($startedAt));
+            throw $exception;
         } catch (RequestException $exception) {
-            throw $this->handleException($exception);
+            $error = $this->handleException($exception);
+            $this->pushCallLog('youcardx', 'GET', $path, false, $error->getMessage(), $this->elapsedMs($startedAt));
+            throw $error;
         } catch (GuzzleException $exception) {
-            throw new YoucardxApiException('Failed to refresh YouCard access token: ' . $exception->getMessage(), 0, [], $exception);
+            $message = 'Failed to refresh YouCard access token: ' . $exception->getMessage();
+            $this->pushCallLog('youcardx', 'GET', $path, false, $message, $this->elapsedMs($startedAt));
+            throw new YoucardxApiException($message, 0, [], $exception);
         }
-
-        $result = $this->parseResponse($response);
-        $data = $result['data'] ?? [];
-
-        if (! self::isSuccess($result) || empty($data['access_token'])) {
-            throw new YoucardxApiException(
-                'Failed to refresh YouCard access token: ' . ($result['message'] ?? 'token not found'),
-                0,
-                $result
-            );
-        }
-
-        $this->accessToken = (string) $data['access_token'];
-        $this->tokenType = (string) ($data['token_type'] ?? 'Bearer');
-        $this->tokenExpiresAt = time() + (int) ($data['expires_in'] ?? 0);
-
-        if (is_callable($this->config->tokenSaver)) {
-            call_user_func($this->config->tokenSaver, [
-                'access_token' => $this->accessToken,
-                'token_type' => $this->tokenType,
-                'expires_at' => $this->tokenExpiresAt,
-            ]);
-        }
-
-        return $this->accessToken;
     }
 
     public function setAccessToken(string $token, ?int $expiresAt = null, string $tokenType = 'Bearer'): void
@@ -234,10 +250,20 @@ class Client implements PlatformClientInterface
             $options['body'] = $body;
         }
 
+        $startedAt = microtime(true);
+
         try {
             $response = $this->httpClient->request($method, ltrim($path, '/'), $options);
+            $result = $this->parseResponse($response, true);
+            $this->pushCallLog('youcardx', $method, $path, true, '', $this->elapsedMs($startedAt));
+
+            return $result;
+        } catch (YoucardxApiException $exception) {
+            $this->pushCallLog('youcardx', $method, $path, false, $exception->getMessage(), $this->elapsedMs($startedAt));
+            throw $exception;
         } catch (RequestException $exception) {
             $error = $this->handleException($exception);
+            $this->pushCallLog('youcardx', $method, $path, false, $error->getMessage(), $this->elapsedMs($startedAt));
             if ($error instanceof YoucardxTokenExpiredException && ! $retried) {
                 if (! $this->loadSharedToken()) {
                     $this->refreshAccessToken();
@@ -247,10 +273,10 @@ class Client implements PlatformClientInterface
             }
             throw $error;
         } catch (GuzzleException $exception) {
-            throw new YoucardxApiException('YouCard request failed: ' . $exception->getMessage(), 0, [], $exception);
+            $message = 'YouCard request failed: ' . $exception->getMessage();
+            $this->pushCallLog('youcardx', $method, $path, false, $message, $this->elapsedMs($startedAt));
+            throw new YoucardxApiException($message, 0, [], $exception);
         }
-
-        return $this->parseResponse($response, true);
     }
 
     protected function parseResponse(ResponseInterface $response, bool $verify = false): array

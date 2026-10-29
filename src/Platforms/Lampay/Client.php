@@ -6,6 +6,7 @@ namespace Goletter\Card\Platforms\Lampay;
 
 use Goletter\Card\Contract\PlatformClientInterface;
 use Goletter\Card\Platforms\Lampay\Exceptions\LampayApiException;
+use Goletter\Card\Support\LogsHttpRequests;
 use Goletter\Card\Support\Result;
 use GuzzleHttp\Client as GuzzleClient;
 use GuzzleHttp\Exception\GuzzleException;
@@ -14,6 +15,8 @@ use Psr\Http\Message\ResponseInterface;
 
 class Client implements PlatformClientInterface
 {
+    use LogsHttpRequests;
+
     protected Config $config;
 
     protected GuzzleClient $httpClient;
@@ -28,6 +31,7 @@ class Client implements PlatformClientInterface
             $config = new Config($config);
         }
         $this->config = $config;
+        $this->logRequest = $config->logRequest;
         $this->signer = new Signer($this->config);
         $this->crypto = new Crypto($this->config);
         $this->httpClient = new GuzzleClient([
@@ -169,14 +173,25 @@ class Client implements PlatformClientInterface
             $guzzleOptions['body'] = $body;
         }
 
+        $startedAt = microtime(true);
+
         try {
             $response = $this->httpClient->request($method, ltrim($path, '/'), $guzzleOptions);
+            $result = $this->handleResponse($response, $requestId);
+            $this->pushCallLog('lampay', $method, $path, true, '', $this->elapsedMs($startedAt));
 
-            return $this->handleResponse($response, $requestId);
+            return $result;
+        } catch (LampayApiException $e) {
+            $this->pushCallLog('lampay', $method, $path, false, $e->getMessage(), $this->elapsedMs($startedAt));
+            throw $e;
         } catch (RequestException $e) {
-            throw $this->handleException($e);
+            $exception = $this->handleException($e);
+            $this->pushCallLog('lampay', $method, $path, false, $exception->getMessage(), $this->elapsedMs($startedAt));
+            throw $exception;
         } catch (GuzzleException $e) {
-            throw new LampayApiException('Request failed: ' . $e->getMessage(), 0, [], $e);
+            $message = 'Request failed: ' . $e->getMessage();
+            $this->pushCallLog('lampay', $method, $path, false, $message, $this->elapsedMs($startedAt));
+            throw new LampayApiException($message, 0, [], $e);
         }
     }
 

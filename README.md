@@ -237,6 +237,7 @@ $airwallex = new Airwallex([
 | apiKey | string | 是 | - | API Key |
 | clientId | string | 是 | - | Client ID |
 | timeout | int | 否 | 60 | 请求超时时间（秒） |
+| log_request | bool | 否 | false | 是否记录每次请求耗时（见「调用日志 / 耗时」） |
 | requestSource | int | 否 | 4 | 请求来源标识 |
 
 ### 认证 API
@@ -426,6 +427,7 @@ $slash = new Slash([
 | base_url / baseUrl | string | 否 | `https://api.slash.com` | API 基础地址 |
 | api_key / apiKey | string | 是 | - | API Key（`X-API-Key`） |
 | timeout | int | 否 | 60 | 请求超时（秒） |
+| log_request | bool | 否 | false | 是否记录每次请求耗时（见「调用日志 / 耗时」） |
 | rsa_public_key | string | 否 | - | 请求敏感字段时的 RSA 公钥 |
 | private_key | string | 否 | - | 解密 PAN/CVV 的私钥 PEM |
 | vault_base_url | string | 否 | 自动推导 | 敏感读卡 vault 地址 |
@@ -904,6 +906,50 @@ try {
 }
 ```
 
+## 调用日志 / 耗时
+
+每次出站 HTTP 请求都会统计耗时（毫秒）。日志不含 Token / API Key / 卡号等敏感字段。
+
+```php
+use Goletter\Card\CardFactory;
+// 或：use Goletter\Card\Support\CallLog;
+
+CardFactory::setCallLogHandler(function (array $log): void {
+    // $log['platform']       slash / airwallex / ...
+    // $log['api_interface']  GET:/cards
+    // $log['is_success']     1 成功，0 失败
+    // $log['error']
+    // $log['duration_ms']    请求耗时（毫秒）
+    // $log['call_hour']      Y-m-d H:00:00
+    // $log['created_at']
+});
+```
+
+| 开关 | 行为 |
+|------|------|
+| `log_request=false`（默认） | 失败时若有 `hyperf-utils` 的 `logging()`，写 `call_logs`（含 `duration_ms`） |
+| `log_request=true` | 成功/失败都会写 `call_logs`（含 `duration_ms`） |
+| `CardFactory::setCallLogHandler` / `CallLog::setHandler` | 有 handler 时每次请求回调（含 `duration_ms`），与上面开关独立 |
+
+配置示例（各平台段均可设；也可用全局环境变量 `CARD_LOG_REQUEST`）：
+
+```php
+'slash' => [
+    // ...
+    'log_request' => (bool) env('SLASH_LOG_REQUEST', env('CARD_LOG_REQUEST', false)),
+],
+```
+
+```php
+// 构造时强制开启
+$bundle = CardFactory::slash([
+    'api_key' => '...',
+    'log_request' => true,
+]);
+```
+
+未设置 handler 且未开 `log_request`、请求又成功时，不写额外日志。
+
 ## 注意事项
 
 ### Airwallex
@@ -965,9 +1011,11 @@ try {
 
 1. **请求超时**：默认超时时间为 60 秒，可根据实际情况调整。
 
-2. **错误处理**：建议在生产环境中对异常进行适当的处理和日志记录。
+2. **请求耗时**：各平台支持 `log_request`；详见上文「调用日志 / 耗时」。
 
-3. **API 文档**：具体 API 字段和参数请参考各平台的官方 API 文档。
+3. **错误处理**：建议在生产环境中对异常进行适当的处理和日志记录。
+
+4. **API 文档**：具体 API 字段和参数请参考各平台的官方 API 文档。
 
 ## 许可证
 

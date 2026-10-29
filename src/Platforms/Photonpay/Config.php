@@ -16,6 +16,11 @@ class Config
 
     public int $timeout;
 
+    /**
+     * Whether to log every request duration (call_logs / CallLog handler).
+     */
+    public bool $logRequest;
+
     public string $matrixAccount;
 
     public string $privateKey;
@@ -41,6 +46,7 @@ class Config
         $this->apiKey = ConfigSupport::string($config, ['api_key', 'apiKey']);
         $this->apiSecret = ConfigSupport::string($config, ['api_secret', 'apiSecret', 'client_id', 'clientId']);
         $this->timeout = ConfigSupport::int($config, ['timeout'], 60);
+        $this->logRequest = ConfigSupport::bool($config, ['log_request', 'logRequest'], false);
         $this->matrixAccount = ConfigSupport::string($config, ['matrix_account', 'matrixAccount']);
         $this->privateKey = ConfigSupport::string($config, ['private_key', 'privateKey']);
         $this->token = ConfigSupport::string($config, ['token', 'access_token', 'accessToken']);

@@ -47,6 +47,11 @@ class Config
     public int $timeout;
 
     /**
+     * Whether to log every request duration (call_logs / CallLog handler).
+     */
+    public bool $logRequest;
+
+    /**
      * @param array<string, mixed> $config
      */
     public function __construct(array $config = [])
@@ -56,6 +61,7 @@ class Config
         $this->apiVersion = ConfigSupport::string($config, ['apiVersion', 'api_version'], '1');
         $this->providerType = ConfigSupport::string($config, ['providerType', 'provider_type'], '10010105');
         $this->timeout = ConfigSupport::int($config, ['timeout'], 60);
+        $this->logRequest = ConfigSupport::bool($config, ['log_request', 'logRequest'], false);
         $this->verifyResponseSignature = ConfigSupport::bool($config, ['verifyResponseSignature', 'verify_response_signature'], true);
 
         $this->merchantAuthPrivateKeyPem = $this->normalizePem(ConfigSupport::string($config, [

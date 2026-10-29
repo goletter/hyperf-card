@@ -20,6 +20,8 @@ return [
         'api_key' => env('AIRWALLEX_API_KEY', ''),
         'client_id' => env('AIRWALLEX_CLIENT_ID', ''),
         'timeout' => 60,
+        // 请求耗时日志，默认关闭；开启后成功/失败都会写 call_logs（需 hyperf-utils）
+        'log_request' => (bool) env('AIRWALLEX_LOG_REQUEST', env('CARD_LOG_REQUEST', false)),
         'request_source' => 4,
         // 'access_token' => '',
         // 'expires_in' => 0,
@@ -31,6 +33,7 @@ return [
         'base_url' => env('SLASH_BASE_URL', 'https://api.slash.com'),
         'api_key' => env('SLASH_API_KEY', ''),
         'timeout' => 60,
+        'log_request' => (bool) env('SLASH_LOG_REQUEST', env('CARD_LOG_REQUEST', false)),
         // 'rsa_public_key' => env('SLASH_RSA_PUBLIC_KEY', ''),
         // 'private_key' => env('SLASH_PRIVATE_KEY', ''),
         // 'vault_base_url' => env('SLASH_VAULT_URL', ''),
@@ -52,6 +55,7 @@ return [
         'api_version' => env('LAMPAY_API_VERSION', '1'),
         'verify_response_signature' => true,
         'timeout' => 60,
+        'log_request' => (bool) env('LAMPAY_LOG_REQUEST', env('CARD_LOG_REQUEST', false)),
     ],
 
     'photonpay' => [
@@ -64,6 +68,7 @@ return [
         // 'token_url' => '',
         'verify_ssl' => true,
         'timeout' => 60,
+        'log_request' => (bool) env('PHOTONPAY_LOG_REQUEST', env('CARD_LOG_REQUEST', false)),
     ],
 
     'wasabi' => [
@@ -72,6 +77,7 @@ return [
         'private_key' => env('WASABI_PRIVATE_KEY', ''),
         'wsb_public_key' => env('WASABI_WSB_PUBLIC_KEY', ''),
         'timeout' => 60,
+        'log_request' => (bool) env('WASABI_LOG_REQUEST', env('CARD_LOG_REQUEST', false)),
     ],
 
     'youcardx' => [
@@ -80,6 +86,7 @@ return [
         'client_id' => env('YOUCARDX_CLIENT_ID', ''),
         'secret' => env('YOUCARDX_SECRET', ''),
         'timeout' => 60,
+        'log_request' => (bool) env('YOUCARDX_LOG_REQUEST', env('CARD_LOG_REQUEST', false)),
         'verify_response' => true,
         // 'access_token' => '',
         // 'token_type' => 'Bearer',

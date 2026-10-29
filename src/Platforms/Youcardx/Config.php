@@ -29,6 +29,11 @@ class Config
     public int $timeout;
 
     /**
+     * Whether to log every request duration (call_logs / CallLog handler).
+     */
+    public bool $logRequest;
+
+    /**
      * Cached access token.
      */
     public string $accessToken;
@@ -68,6 +73,7 @@ class Config
         $this->clientId = (string) ($config['client_id'] ?? $config['clientId'] ?? '');
         $this->secret = (string) ($config['secret'] ?? $config['api_secret'] ?? $config['merchant_secret'] ?? '');
         $this->timeout = (int) ($config['timeout'] ?? 60);
+        $this->logRequest = (bool) ($config['log_request'] ?? $config['logRequest'] ?? false);
         $this->accessToken = (string) ($config['access_token'] ?? $config['accessToken'] ?? '');
         $this->tokenType = (string) ($config['token_type'] ?? $config['tokenType'] ?? 'Bearer');
         $this->tokenExpiresAt = (int) ($config['expires_in'] ?? $config['tokenExpiresAt'] ?? 0);

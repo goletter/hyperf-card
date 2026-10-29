@@ -21,6 +21,11 @@ class Config
 
     public int $timeout;
 
+    /**
+     * Whether to log every request duration (call_logs / CallLog handler).
+     */
+    public bool $logRequest;
+
     public int $requestSource;
 
     public string $accessToken;
@@ -46,6 +51,7 @@ class Config
         $this->baseUrl = rtrim(ConfigSupport::string($config, ['base_url', 'baseUrl'], 'https://api.slash.com'), '/');
         $this->apiKey = ConfigSupport::string($config, ['api_key', 'apiKey']);
         $this->timeout = ConfigSupport::int($config, ['timeout'], 60);
+        $this->logRequest = ConfigSupport::bool($config, ['log_request', 'logRequest'], false);
         $this->requestSource = ConfigSupport::int($config, ['request_source', 'requestSource'], 4);
         $this->accessToken = ConfigSupport::string($config, ['access_token', 'accessToken']);
         $this->rsaPublicKey = ConfigSupport::string($config, ['rsa_public_key', 'rsaPublicKey']);
