@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Goletter\Card\Platforms\Lampay;
 
+use Goletter\Card\CardFactory;
 use Goletter\Card\Contract\PlatformClientInterface;
 use Goletter\Card\Platforms\Lampay\Exceptions\LampayApiException;
 use Goletter\Card\Support\LogsHttpRequests;
@@ -25,7 +26,7 @@ class Client implements PlatformClientInterface
 
     protected Crypto $crypto;
 
-    public function __construct(Config|array $config)
+    public function __construct(Config|array $config, ?GuzzleClient $http = null)
     {
         if (is_array($config)) {
             $config = new Config($config);
@@ -34,7 +35,7 @@ class Client implements PlatformClientInterface
         $this->logRequest = $config->logRequest;
         $this->signer = new Signer($this->config);
         $this->crypto = new Crypto($this->config);
-        $this->httpClient = new GuzzleClient([
+        $this->httpClient = $http ?? CardFactory::httpClient([
             'base_uri' => $this->config->baseUrl . '/',
             'timeout' => $this->config->timeout,
             'http_errors' => false,

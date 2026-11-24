@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Goletter\Card\Platforms\Airwallex;
 
+use Goletter\Card\CardFactory;
 use Goletter\Card\Contract\PlatformClientInterface;
 use Goletter\Card\Contract\TokenPersisterInterface;
 use Goletter\Card\Platforms\Airwallex\Exceptions\AirwallexApiException;
@@ -29,14 +30,14 @@ class Client implements PlatformClientInterface
 
     protected int|string|null $cardAccountId = null;
 
-    public function __construct(Config|array $config)
+    public function __construct(Config|array $config, ?GuzzleClient $http = null)
     {
         if (is_array($config)) {
             $config = new Config($config);
         }
         $this->config = $config;
         $this->logRequest = $config->logRequest;
-        $this->httpClient = new GuzzleClient([
+        $this->httpClient = $http ?? CardFactory::httpClient([
             'base_uri' => $this->config->baseUrl,
             'timeout' => $this->config->timeout,
             'http_errors' => false,

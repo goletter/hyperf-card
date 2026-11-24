@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Goletter\Card\Platforms\Slash;
 
+use Goletter\Card\CardFactory;
 use Goletter\Card\Contract\PlatformClientInterface;
 use Goletter\Card\Platforms\Slash\Exceptions\SlashApiException;
 use Goletter\Card\Platforms\Slash\Exceptions\SlashTokenExpiredException;
@@ -25,7 +26,7 @@ class Client implements PlatformClientInterface
 
     protected GuzzleClient $httpClient;
 
-    public function __construct(Config|array $config)
+    public function __construct(Config|array $config, ?GuzzleClient $http = null)
     {
         if (is_array($config)) {
             $config = new Config($config);
@@ -41,7 +42,7 @@ class Client implements PlatformClientInterface
         if ($this->config->rsaPublicKey !== '') {
             $headers['X-RSA-Public-Key'] = $this->config->rsaPublicKey;
         }
-        $this->httpClient = new GuzzleClient([
+        $this->httpClient = $http ?? CardFactory::httpClient([
             'base_uri' => $this->config->baseUrl . '/',
             'timeout' => $this->config->timeout,
             'http_errors' => false,

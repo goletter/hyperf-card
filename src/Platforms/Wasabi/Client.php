@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Goletter\Card\Platforms\Wasabi;
 
+use Goletter\Card\CardFactory;
 use Goletter\Card\Contract\PlatformClientInterface;
 use Goletter\Card\Platforms\Wasabi\Exceptions\WasabiApiException;
 use Goletter\Card\Support\LogsHttpRequests;
@@ -26,14 +27,14 @@ class Client implements PlatformClientInterface
 
     protected GuzzleClient $httpClient;
 
-    public function __construct(Config|array $config)
+    public function __construct(Config|array $config, ?GuzzleClient $http = null)
     {
         if (is_array($config)) {
             $config = new Config($config);
         }
         $this->config = $config;
         $this->logRequest = $config->logRequest;
-        $this->httpClient = new GuzzleClient([
+        $this->httpClient = $http ?? CardFactory::httpClient([
             'base_uri' => $this->config->baseUrl . '/',
             'timeout' => $this->config->timeout,
             'http_errors' => false,

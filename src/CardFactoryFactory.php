@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Goletter\Card;
 
 use Hyperf\Contract\ConfigInterface;
+use Hyperf\Guzzle\ClientFactory;
 use Psr\Container\ContainerInterface;
 
 /**
@@ -19,7 +20,11 @@ class CardFactoryFactory
             $config = (array) $container->get(ConfigInterface::class)->get('card', []);
         }
 
-        $factory = new CardFactory($config);
+        $clientFactory = $container->has(ClientFactory::class)
+            ? $container->get(ClientFactory::class)
+            : null;
+
+        $factory = new CardFactory($config, $clientFactory);
         CardFactory::setShared($factory);
 
         return $factory;

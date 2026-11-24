@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Goletter\Card\Platforms\Youcardx;
 
+use Goletter\Card\CardFactory;
 use Goletter\Card\Contract\PlatformClientInterface;
 use Goletter\Card\Platforms\Youcardx\Exceptions\YoucardxApiException;
 use Goletter\Card\Platforms\Youcardx\Exceptions\YoucardxTokenExpiredException;
@@ -31,14 +32,14 @@ class Client implements PlatformClientInterface
 
     protected ?int $tokenExpiresAt = null;
 
-    public function __construct(Config|array $config)
+    public function __construct(Config|array $config, ?GuzzleClient $http = null)
     {
         if (is_array($config)) {
             $config = new Config($config);
         }
         $this->config = $config;
         $this->logRequest = $config->logRequest;
-        $this->httpClient = new GuzzleClient([
+        $this->httpClient = $http ?? CardFactory::httpClient([
             'base_uri' => $this->config->baseUrl . '/',
             'timeout' => $this->config->timeout,
             'headers' => [
